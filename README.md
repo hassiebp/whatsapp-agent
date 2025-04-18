@@ -24,33 +24,38 @@ A WhatsApp-based AI agent powered by a multimodal LLM. Users can interact one-on
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - pnpm
 - PostgreSQL database
 - Twilio account with WhatsApp Business API access
 - OpenAI API key
-- Langfuse account (optional)
+- Langfuse account
 
 ### Setup
 
 1. Clone the repository:
+
    ```
-   git clone https://github.com/yourusername/whatsapp-agent.git
+   git clone https://github.com/hassiebp/whatsapp-agent.git
    cd whatsapp-agent
    ```
 
 2. Install dependencies:
+
    ```
    pnpm install
    ```
 
 3. Set up environment variables:
+
    ```
    cp .env.example .env
    ```
+
    Then edit the `.env` file with your credentials.
 
 4. Set up the database:
+
    ```
    pnpm prisma migrate deploy
    ```
@@ -60,29 +65,7 @@ A WhatsApp-based AI agent powered by a multimodal LLM. Users can interact one-on
    pnpm dev
    ```
 
-### Local Testing
-
-To test with Twilio webhooks locally:
-
-1. Install ngrok: `npm install -g ngrok`
-2. Start your local server: `pnpm dev`
-3. Start ngrok: `ngrok http 3000`
-4. Update your Twilio WhatsApp webhook URL to the ngrok URL + `/webhook/whatsapp`
-
-## Deployment
-
-This project is configured for deployment to Google Cloud Run:
-
-1. Build the Docker image:
-   ```
-   docker build -t whatsapp-agent .
-   ```
-
-2. Deploy to Cloud Run:
-   ```
-   gcloud run deploy whatsapp-agent --image whatsapp-agent --platform managed
-   ```
-
 ## License
 
 [MIT](LICENSE)
+

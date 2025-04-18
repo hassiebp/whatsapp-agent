@@ -1,4 +1,6 @@
-import { PrismaClient, MessageRole, MessageType } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
+import { MessageRole, MessageType } from "../types.js";
+import logger from "./logger.js";
 
 // Initialize Prisma client
 const prisma = new PrismaClient();
@@ -12,7 +14,7 @@ export async function findOrCreateUser(phone: string) {
     let user = await prisma.user.findUnique({
       where: { phone },
     });
-    
+
     // If the user doesn't exist, create them
     if (!user) {
       user = await prisma.user.create({
@@ -20,13 +22,13 @@ export async function findOrCreateUser(phone: string) {
           phone,
         },
       });
-      console.log(`Created new user with phone ${phone}`);
+      logger.info(`Created new user with phone ${phone}`);
     }
-    
+
     return user;
   } catch (error) {
-    console.error('Error finding or creating user:', error);
-    throw new Error('Database error: Could not find or create user');
+    logger.error("Error finding or creating user:", error);
+    throw new Error("Database error: Could not find or create user");
   }
 }
 
@@ -39,10 +41,10 @@ export async function isUserBanned(userId: string) {
       where: { id: userId },
       select: { isBanned: true },
     });
-    
+
     return user?.isBanned || false;
   } catch (error) {
-    console.error('Error checking if user is banned:', error);
+    logger.error("Error checking if user is banned:", error);
     return false; // Default to not banned in case of error
   }
 }
@@ -56,10 +58,10 @@ export async function banUser(userId: string) {
       where: { id: userId },
       data: { isBanned: true },
     });
-    
+
     return true;
   } catch (error) {
-    console.error('Error banning user:', error);
+    logger.error("Error banning user:", error);
     return false;
   }
 }
@@ -74,7 +76,6 @@ export async function createMessage({
   content,
   mediaUrl = null,
   mediaHash = null,
-  moderationFlagged = null,
   moderationReason = null,
 }: {
   userId: string;
@@ -95,15 +96,14 @@ export async function createMessage({
         content,
         mediaUrl,
         mediaHash,
-        moderationFlagged,
         moderationReason,
       },
     });
-    
+
     return message;
   } catch (error) {
-    console.error('Error creating message:', error);
-    throw new Error('Database error: Could not create message');
+    logger.error("Error creating message:", error);
+    throw new Error("Database error: Could not create message");
   }
 }
 
@@ -116,31 +116,31 @@ export async function getConversationHistory(userId: string) {
     const lastClearCommand = await prisma.message.findFirst({
       where: {
         userId,
-        type: 'command',
-        content: 'clear',
+        type: "command",
+        content: "clear",
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
-    
+
     // Get all messages after the last clear command, or all messages if no clear command
     const messages = await prisma.message.findMany({
       where: {
         userId,
-        createdAt: lastClearCommand 
-          ? { gt: lastClearCommand.createdAt } 
+        createdAt: lastClearCommand
+          ? { gt: lastClearCommand.createdAt }
           : undefined,
       },
       orderBy: {
-        createdAt: 'asc',
+        createdAt: "asc",
       },
     });
-    
+
     return messages;
   } catch (error) {
-    console.error('Error retrieving conversation history:', error);
-    throw new Error('Database error: Could not retrieve conversation history');
+    logger.error("Error retrieving conversation history:", error);
+    throw new Error("Database error: Could not retrieve conversation history");
   }
 }
 
@@ -153,23 +153,23 @@ export async function hasNewerMessages(userId: string, messageId: string) {
       where: { id: messageId },
       select: { createdAt: true },
     });
-    
+
     if (!message) {
       return false;
     }
-    
+
     // Check if there are any newer messages from the same user
     const newerMessageCount = await prisma.message.count({
       where: {
         userId,
-        role: 'user',
+        role: "user",
         createdAt: { gt: message.createdAt },
       },
     });
-    
+
     return newerMessageCount > 0;
   } catch (error) {
-    console.error('Error checking for newer messages:', error);
+    logger.error("Error checking for newer messages:", error);
     return false; // Default to false in case of error
   }
 }

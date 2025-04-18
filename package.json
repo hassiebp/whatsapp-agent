@@ -1,48 +1,39 @@
 {
   "name": "whatsapp-agent",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "WhatsApp LLM Agent MVP",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon --exec node --loader ts-node/esm src/index.ts",
-    "build": "tsup src/index.ts --format esm",
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'tsx src/index.ts'",
+    "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "prisma:migrate": "prisma migrate deploy"
   },
-  "keywords": [
-    "whatsapp",
-    "llm",
-    "openai",
-    "twilio"
-  ],
-  "author": "",
-  "license": "ISC",
+  "keywords": [],
+  "author": "Hassieb Pakzad",
+  "license": "MIT",
   "dependencies": {
     "@prisma/client": "^6.6.0",
-    "@types/express": "^5.0.1",
-    "@types/node": "^22.14.1",
     "axios": "^1.8.4",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "langfuse": "^3.37.2",
     "openai": "^4.95.0",
-    "ts-node": "^10.9.2",
+    "pino": "^9.6.0",
+    "pino-http": "^10.4.0",
+    "pino-pretty": "^13.0.0",
     "twilio": "^5.5.2",
-    "typescript": "^5.8.3",
     "zod": "^3.24.3"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^3.1.1",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.14.1",
+    "@types/pino": "^7.0.5",
     "nodemon": "^3.1.9",
     "prisma": "^6.6.0",
-    "tsup": "^8.4.0",
-    "vite": "^6.3.1",
-    "vitest": "^3.1.1"
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
   }
 }

@@ -1,8 +1,9 @@
-import twilio from 'twilio';
-import axios from 'axios';
-import config from '../config/index.js';
+import twilio from "twilio";
+import axios from "axios";
+import config from "../config/index.js";
+import { MessageType } from "../types.js";
+import logger from "./logger.js";
 
-// Initialize Twilio client
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
 
 /**
@@ -15,10 +16,12 @@ export async function sendWhatsAppMessage(to: string, body: string) {
       from: `whatsapp:${config.twilio.phoneNumber}`,
       to: `whatsapp:${to}`,
     });
-    
+
     return { success: true, messageSid: result.sid };
   } catch (error) {
-    console.error('Error sending WhatsApp message:', error);
+    console.error(error);
+    logger.error("Error sending WhatsApp message:", error);
+
     return { success: false, error };
   }
 }
@@ -33,16 +36,16 @@ export async function downloadMedia(mediaUrl: string) {
       username: config.twilio.accountSid,
       password: config.twilio.authToken,
     };
-    
+
     const response = await axios.get(mediaUrl, {
       auth,
-      responseType: 'arraybuffer',
+      responseType: "arraybuffer",
     });
-    
+
     return Buffer.from(response.data);
   } catch (error) {
-    console.error('Error downloading media:', error);
-    throw new Error('Failed to download media from Twilio');
+    logger.error("Error downloading media:", error);
+    throw new Error("Failed to download media from Twilio");
   }
 }
 
@@ -58,15 +61,15 @@ export function extractMessageData(body: any) {
     MediaUrl0: mediaUrl,
     SmsMessageSid: messageSid,
   } = body;
-  
-  const numMedia = parseInt(numMediaStr || '0', 10);
-  
+
+  const numMedia = parseInt(numMediaStr || "0", 10);
+
   // Extract the phone number without the WhatsApp prefix
-  const phoneNumber = from.replace('whatsapp:', '');
-  
+  const phoneNumber = from.replace("whatsapp:", "");
+
   return {
     from: phoneNumber,
-    body: textBody || '',
+    body: textBody || "",
     messageSid,
     hasMedia: numMedia > 0,
     mediaType: mediaType || null,
@@ -78,24 +81,25 @@ export function extractMessageData(body: any) {
 /**
  * Determines the message type based on the Twilio webhook data
  */
-export function determineMessageType(webhookData: any) {
+export function determineMessageType(webhookData: any): MessageType {
   if (!webhookData.hasMedia) {
-    // Check if it's a "clear" command
-    if (webhookData.body?.toLowerCase() === 'clear') {
-      return 'command';
+    if (webhookData.body?.toLowerCase() === "clear") {
+      return MessageType.COMMAND;
     }
-    return 'text';
+    return MessageType.TEXT;
   }
-  
-  // Check media type to determine if it's an image or audio
-  const mediaType = webhookData.mediaType?.toLowerCase() || '';
-  
-  if (mediaType.startsWith('image/')) {
-    return 'image';
-  } else if (mediaType.startsWith('audio/') || mediaType.includes('ogg') || mediaType.includes('voice')) {
-    return 'audio';
+
+  const mediaType = webhookData.mediaType?.toLowerCase() || "";
+
+  if (mediaType.startsWith("image/")) {
+    return MessageType.IMAGE;
+  } else if (
+    mediaType.startsWith("audio/") ||
+    mediaType.includes("ogg") ||
+    mediaType.includes("voice")
+  ) {
+    return MessageType.AUDIO;
   }
-  
-  // Default to text if we can't determine the type
-  return 'text';
+
+  return MessageType.TEXT;
 }
