@@ -2,7 +2,24 @@ import { PrismaClient } from "@prisma/client";
 import { MessageRole, MessageType } from "../types.js";
 import logger from "./logger.js";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: [
+    { level: 'query', emit: 'event' },
+    { level: 'error', emit: 'stdout' },
+    { level: 'info', emit: 'stdout' },
+    { level: 'warn', emit: 'stdout' },
+  ],
+});
+
+// Set up Prisma query logging to be handled by our logger
+prisma.$on('query', (e) => {
+  logger.debug({
+    query: e.query,
+    params: e.params,
+    duration: e.duration,
+    timestamp: e.timestamp,
+  }, 'Prisma Query');
+});
 
 export async function findOrCreateUser(params: {
   phone: string;
