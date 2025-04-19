@@ -80,7 +80,7 @@ export function determineMessageType(webhookData: any): MessageType {
     return MessageType.TEXT;
   }
 
-  const mediaType = webhookData.mediaType?.toLowerCase() || "";
+  const mediaType = webhookData.mediaContentType?.toLowerCase() || "";
 
   if (mediaType.startsWith("image/")) {
     return MessageType.IMAGE;

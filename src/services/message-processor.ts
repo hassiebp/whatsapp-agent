@@ -60,11 +60,11 @@ export async function processMessage(
     }
 
     let content = messageData.body || "";
-    let mediaUrl = messageData.mediaTwilioUrl;
+    let mediaTwilioUrl = messageData.mediaTwilioUrl;
     let mediaSha256Hash: string | null = null;
 
-    if (messageData.hasMedia && mediaUrl) {
-      const mediaBuffer = await twilioService.downloadMedia(mediaUrl);
+    if (messageData.hasMedia && mediaTwilioUrl) {
+      const mediaBuffer = await twilioService.downloadMedia(mediaTwilioUrl);
       const langfuseMedia = new LangfuseMedia({
         contentBytes: mediaBuffer,
         contentType: messageData.mediaContentType,
@@ -107,7 +107,7 @@ export async function processMessage(
         role: MessageRole.USER,
         type: messageType as MessageType,
         content,
-        mediaTwilioUrl: mediaUrl,
+        mediaTwilioUrl,
         mediaSha256Hash,
         mediaContentType: messageData.mediaContentType,
         moderationReason: moderation.categories?.join(", "),
@@ -127,7 +127,7 @@ export async function processMessage(
       role: MessageRole.USER,
       type: messageType as MessageType,
       content,
-      mediaTwilioUrl: mediaUrl,
+      mediaTwilioUrl,
       mediaSha256Hash,
     });
 
