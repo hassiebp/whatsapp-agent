@@ -6,9 +6,6 @@ import logger from "./logger.js";
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
 
-/**
- * Send a text message via WhatsApp using Twilio API
- */
 export async function sendWhatsAppMessage(to: string, body: string) {
   try {
     const result = await twilioClient.messages.create({
@@ -19,19 +16,14 @@ export async function sendWhatsAppMessage(to: string, body: string) {
 
     return { success: true, messageSid: result.sid };
   } catch (error) {
-    console.error(error);
-    logger.error("Error sending WhatsApp message:", error);
+    logger.error(error, "Error sending WhatsApp message");
 
     return { success: false, error };
   }
 }
 
-/**
- * Downloads media from Twilio's API
- */
 export async function downloadMedia(mediaUrl: string) {
   try {
-    // Twilio requires authentication to download media
     const auth = {
       username: config.twilio.accountSid,
       password: config.twilio.authToken,
@@ -44,14 +36,12 @@ export async function downloadMedia(mediaUrl: string) {
 
     return Buffer.from(response.data);
   } catch (error) {
-    logger.error("Error downloading media:", error);
+    logger.error(error, "Error downloading media");
+
     throw new Error("Failed to download media from Twilio");
   }
 }
 
-/**
- * Extracts relevant message data from a Twilio webhook
- */
 export function extractMessageData(body: any) {
   const {
     From: from,
@@ -60,6 +50,8 @@ export function extractMessageData(body: any) {
     MediaContentType0: mediaType,
     MediaUrl0: mediaUrl,
     SmsMessageSid: messageSid,
+    ProfileName: profileName,
+    Forwarded: isFordwarded,
   } = body;
 
   const numMedia = parseInt(numMediaStr || "0", 10);
@@ -75,12 +67,11 @@ export function extractMessageData(body: any) {
     mediaType: mediaType || null,
     mediaUrl: mediaUrl || null,
     numMedia,
+    profileName,
+    isFordwarded,
   };
 }
 
-/**
- * Determines the message type based on the Twilio webhook data
- */
 export function determineMessageType(webhookData: any): MessageType {
   if (!webhookData.hasMedia) {
     if (webhookData.body?.toLowerCase() === "clear") {

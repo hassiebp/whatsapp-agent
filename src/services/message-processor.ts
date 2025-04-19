@@ -1,13 +1,11 @@
-import { createHash } from "crypto";
 import { MessageRole, MessageType } from "../types.js";
 import * as dbService from "./db.js";
 import * as twilioService from "./twilio.js";
 import * as openaiService from "./openai.js";
 import logger from "./logger.js";
+import { langfuseClient } from "./langfuse.js";
+import { LangfuseMedia } from "langfuse";
 
-/**
- * Processes an incoming WhatsApp message asynchronously
- */
 export type ProcessMessageResult =
   | {
       success: true;
@@ -17,20 +15,31 @@ export type ProcessMessageResult =
 export async function processMessage(
   webhookData: unknown,
 ): Promise<ProcessMessageResult> {
+  const trace = langfuseClient.trace({ name: "handleWhatsAppMessage" });
+  const parseWebhookSpan = trace.span({
+    name: "parse-webhook",
+    input: webhookData,
+  });
+
   const messageData = twilioService.extractMessageData(webhookData);
   const messageType = twilioService.determineMessageType(messageData);
 
-  try {
-    // Step 1: Find or create the user
-    const user = await dbService.findOrCreateUser(messageData.from);
+  parseWebhookSpan.end({ output: messageData, metadata: { messageType } });
+  trace.update({ metadata: { messageType } });
 
-    // Step 2: Check if user is banned
+  try {
+    const user = await dbService.findOrCreateUser({
+      phone: messageData.from,
+      name: messageData.profileName,
+    });
+    trace.update({ userId: user.id });
+
     if (user.isBanned) {
       logger.info(`Ignored message from banned user ${user.id}`);
+
       return { success: false, error: "User is banned" };
     }
 
-    // Step 3: Handle "clear" command
     if (
       messageType === "command" &&
       messageData.body.toLowerCase() === "clear"
@@ -50,20 +59,47 @@ export async function processMessage(
       return { success: true };
     }
 
-    // Step 4: Process media if present
     let content = messageData.body || "";
     let mediaUrl = messageData.mediaUrl;
-    let mediaHash = null;
+    let mediaHash: string | null = null;
 
     if (messageData.hasMedia && mediaUrl) {
       const mediaBuffer = await twilioService.downloadMedia(mediaUrl);
-      mediaHash = createHash("md5").update(mediaBuffer).digest("hex");
+      const langfuseMedia = new LangfuseMedia({
+        contentBytes: mediaBuffer,
+        contentType: messageData.mediaType,
+      });
+
+      mediaHash = langfuseMedia.contentSha256Hash ?? null;
+      trace.update({ metadata: { media: langfuseMedia } });
+
       if (messageType === "audio") {
+        const transcriptionSpan = trace.span({
+          name: "transcribe-audio",
+          input: langfuseMedia,
+        });
         content = await openaiService.transcribeAudio(mediaBuffer);
+        transcriptionSpan.end({ output: content });
       }
     }
 
+    trace.update({ input: content });
+
+    const moderationSpan = trace.span({
+      name: "moderate-input",
+      input: content,
+    });
     const moderation = await openaiService.moderateContent(content);
+    moderationSpan.end({
+      output: moderation,
+      metadata: { moderationFlagged: moderation.flagged },
+    });
+    trace.update({
+      metadata: {
+        moderationFlagged: moderation.flagged,
+        moderationCategories: moderation.categories,
+      },
+    });
 
     if (moderation.flagged) {
       await dbService.createMessage({
@@ -82,12 +118,9 @@ export async function processMessage(
         `I'm unable to respond to that message as it may contain inappropriate content. Please try a different question or message.`,
       );
 
-      // Consider banning users who repeatedly send flagged content
-      // This would be implemented based on your specific policy
       return { success: false, error: "Content moderation failed" };
     }
 
-    // Step 6: Save the user message to the database
     const userMessage = await dbService.createMessage({
       userId: user.id,
       role: MessageRole.USER,
@@ -97,10 +130,8 @@ export async function processMessage(
       mediaHash,
     });
 
-    // Step 7: Get conversation history
     const conversationHistory = await dbService.getConversationHistory(user.id);
 
-    // Step 8: Format messages for the LLM
     const appMessages = conversationHistory.map((msg) => ({
       role: msg.role as MessageRole,
       type: msg.type as MessageType,
@@ -108,47 +139,46 @@ export async function processMessage(
       mediaUrl: msg.mediaUrl,
     }));
 
-    // Step 9: Get AI response
-    const aiResponse = await openaiService.getChatCompletion(appMessages);
+    const aiResponse = await openaiService.getChatCompletion(
+      appMessages,
+      trace,
+    );
 
-    // Step 10: Check for newer messages before responding
     const hasNewer = await dbService.hasNewerMessages(user.id, userMessage.id);
 
     if (hasNewer) {
       return { success: false, error: "Newer message detected" };
     }
 
-    // Step 11: Save the assistant's response
     await dbService.createMessage({
       userId: user.id,
       role: MessageRole.ASSISTANT,
       type: MessageType.TEXT,
-      content: aiResponse.content,
+      content: aiResponse,
     });
 
-    // Step 12: Send the response to the user
-    await twilioService.sendWhatsAppMessage(user.phone, aiResponse.content);
+    await twilioService.sendWhatsAppMessage(user.phone, aiResponse);
+
+    trace.update({ output: aiResponse });
 
     return { success: true };
   } catch (error) {
-    logger.error("Error processing message:", error);
+    logger.error(error, "Error processing message");
 
-    // Log the error with context
     logger.error({
       event: "processing_error",
       phone: messageData.from,
       messageId: messageData.messageSid,
-      error: error,
+      error,
     });
 
     try {
-      // Try to send an error message to the user if possible
       await twilioService.sendWhatsAppMessage(
         messageData.from,
         `I'm sorry, I encountered an error processing your message. Please try again later.`,
       );
     } catch (sendError) {
-      logger.error("Error sending error message:", sendError);
+      logger.error(sendError, "Error sending error message");
     }
 
     return { success: false, error: `Error processing message: ${error}` };

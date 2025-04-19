@@ -3,6 +3,7 @@ CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "name" TEXT,
     "phone" TEXT NOT NULL,
     "is_banned" BOOLEAN NOT NULL DEFAULT false,
 

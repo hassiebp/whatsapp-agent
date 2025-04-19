@@ -1,34 +1,10 @@
 import OpenAI from "openai";
-import config from "../config/index.js";
+import { Langfuse, LangfuseTraceClient, observeOpenAI } from "langfuse";
 import { MessageType, MessageRole } from "../types.js";
 import { ChatCompletionMessageParam } from "openai/resources.mjs";
 import logger from "./logger.js";
+import config from "../config/index.js";
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: config.openai.apiKey,
-});
-
-// System prompt that defines the agent's behavior
-const SYSTEM_PROMPT = `You are a helpful AI assistant available via WhatsApp. You provide concise, accurate answers to user queries.
-
-For voice notes:
-- If the transcript is long (more than 100 words) or seems like a monologue, provide a concise summary of the key points.
-- If the transcript is short and conversational, treat it as a normal user query.
-
-For images:
-- Describe what you see in the image and answer any questions about it.
-
-Guidelines:
-- Be helpful, accurate, and concise.
-- Be friendly and conversational, but professional.
-- If you don't know something, admit it rather than making up information.
-- Always respect the user's privacy and don't ask for personal information.
-- Refuse to generate, discuss, or engage with harmful, illegal, unethical, or inappropriate content.
-
-The user can reset the conversation context by sending "clear" (case-insensitive).`;
-
-// Interface for our application's message format
 export interface AppMessage {
   role: MessageRole;
   type: MessageType;
@@ -36,11 +12,9 @@ export interface AppMessage {
   mediaUrl?: string | null;
 }
 
-/**
- * Performs content moderation on text using OpenAI's moderation API
- */
 export async function moderateContent(content: string) {
   try {
+    const openai = new OpenAI();
     const moderationResponse = await openai.moderations.create({
       input: content,
     });
@@ -48,7 +22,6 @@ export async function moderateContent(content: string) {
     const results = moderationResponse.results[0];
 
     if (results.flagged) {
-      // Find which categories were flagged
       const flaggedCategories = Object.entries(results.categories)
         .filter(([_, value]) => value)
         .map(([key, _]) => key);
@@ -62,16 +35,15 @@ export async function moderateContent(content: string) {
 
     return { flagged: false };
   } catch (error) {
-    logger.error("Error during content moderation:", error);
-    // In case of error, we return unflagged to prevent false positives
+    logger.error(error, "Error during content moderation");
+
     return { flagged: false, error };
   }
 }
 
-/**
- * Transcribes audio using OpenAI's Whisper API
- */
 export async function transcribeAudio(audioBuffer: Buffer) {
+  const openai = new OpenAI();
+
   try {
     const transcription = await openai.audio.transcriptions.create({
       file: new File([audioBuffer], "audio.ogg", { type: "audio/ogg" }),
@@ -80,25 +52,26 @@ export async function transcribeAudio(audioBuffer: Buffer) {
 
     return transcription.text;
   } catch (error) {
-    logger.error("Error transcribing audio:", error);
+    logger.error(error, "Error transcribing audio");
+
     throw new Error("Failed to transcribe audio message");
   }
 }
 
-/**
- * Formats app messages into the format expected by OpenAI's API
- */
-function formatMessagesForOpenAI(
+async function formatMessagesForOpenAI(
   messages: AppMessage[],
-): ChatCompletionMessageParam[] {
+): Promise<ChatCompletionMessageParam[]> {
+  const { prompt: systemPrompt } = await new Langfuse().getPrompt(
+    "whatsapp-agent-system-prompt",
+  );
+
   const formattedMessages: ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: SYSTEM_PROMPT,
+      content: systemPrompt,
     },
   ];
 
-  // Format and add the message history
   for (const message of messages) {
     if (message.role === "system" || message.type === "command") {
       continue; // Skip system messages and commands
@@ -132,39 +105,29 @@ function formatMessagesForOpenAI(
   return formattedMessages;
 }
 
-/**
- * Gets a response from OpenAI's API based on the conversation history
- */
-export async function getChatCompletion(messages: AppMessage[]) {
-  const formattedMessages = formatMessagesForOpenAI(messages);
+export async function getChatCompletion(
+  messages: AppMessage[],
+  langfuseTrace: LangfuseTraceClient,
+) {
+  const openai = observeOpenAI(new OpenAI(), {
+    clientInitParams: { environment: config.nodeEnv },
+    parent: langfuseTrace,
+  });
+
+  const formattedMessages = await formatMessagesForOpenAI(messages);
 
   try {
-    // Call the OpenAI API
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-4o",
       messages: formattedMessages,
-      temperature: 0.7,
       max_tokens: 800,
     });
 
     const response = completion.choices[0]?.message?.content || "";
 
-    // Moderate the response for safety
-    const moderation = await moderateContent(response);
-    if (moderation.flagged) {
-      return {
-        content:
-          "I apologize, but I cannot provide that response. Please try a different question.",
-        flagged: true,
-      };
-    }
-
-    return {
-      content: response,
-      flagged: false,
-    };
+    return response;
   } catch (error) {
-    logger.error("Error getting chat completion:", error);
+    logger.error(error, "Error getting chat completion");
 
     throw new Error("Failed to get response from AI");
   }

@@ -10,7 +10,6 @@ const transport = pino.transport({
   },
 });
 
-// Create logger instance
 const logger = pino(
   {
     level: config.isDevelopment ? "debug" : "info",
@@ -20,4 +19,3 @@ const logger = pino(
 );
 
 export default logger;
-
