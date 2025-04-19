@@ -19,9 +19,10 @@ CREATE TABLE "messages" (
     "role" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "content" TEXT NOT NULL,
-    "mediaUrl" TEXT,
-    "mediaHash" TEXT,
     "moderationReason" TEXT,
+    "mediaTwilioUrl" TEXT,
+    "mediaSha256Hash" TEXT,
+    "mediaContentType" TEXT,
 
     CONSTRAINT "messages_pkey" PRIMARY KEY ("id")
 );

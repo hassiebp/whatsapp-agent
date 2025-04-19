@@ -75,16 +75,18 @@ export async function createMessage({
   role,
   type,
   content,
-  mediaUrl = null,
-  mediaHash = null,
+  mediaTwilioUrl = null,
+  mediaSha256Hash = null,
   moderationReason = null,
+  mediaContentType = null,
 }: {
   userId: string;
   role: MessageRole;
   type: MessageType;
   content: string;
-  mediaUrl?: string | null;
-  mediaHash?: string | null;
+  mediaTwilioUrl?: string | null;
+  mediaSha256Hash?: string | null;
+  mediaContentType?: string | null;
   moderationFlagged?: boolean | null;
   moderationReason?: string | null;
 }) {
@@ -95,9 +97,10 @@ export async function createMessage({
         role,
         type,
         content,
-        mediaUrl,
-        mediaHash,
+        mediaTwilioUrl,
+        mediaSha256Hash,
         moderationReason,
+        mediaContentType,
       },
     });
 

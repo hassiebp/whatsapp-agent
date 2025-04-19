@@ -60,17 +60,17 @@ export async function processMessage(
     }
 
     let content = messageData.body || "";
-    let mediaUrl = messageData.mediaUrl;
-    let mediaHash: string | null = null;
+    let mediaUrl = messageData.mediaTwilioUrl;
+    let mediaSha256Hash: string | null = null;
 
     if (messageData.hasMedia && mediaUrl) {
       const mediaBuffer = await twilioService.downloadMedia(mediaUrl);
       const langfuseMedia = new LangfuseMedia({
         contentBytes: mediaBuffer,
-        contentType: messageData.mediaType,
+        contentType: messageData.mediaContentType,
       });
 
-      mediaHash = langfuseMedia.contentSha256Hash ?? null;
+      mediaSha256Hash = langfuseMedia.contentSha256Hash ?? null;
       trace.update({ metadata: { media: langfuseMedia } });
 
       if (messageType === "audio") {
@@ -107,8 +107,9 @@ export async function processMessage(
         role: MessageRole.USER,
         type: messageType as MessageType,
         content,
-        mediaUrl,
-        mediaHash,
+        mediaTwilioUrl: mediaUrl,
+        mediaSha256Hash,
+        mediaContentType: messageData.mediaContentType,
         moderationReason: moderation.categories?.join(", "),
       });
 
@@ -126,8 +127,8 @@ export async function processMessage(
       role: MessageRole.USER,
       type: messageType as MessageType,
       content,
-      mediaUrl,
-      mediaHash,
+      mediaTwilioUrl: mediaUrl,
+      mediaSha256Hash,
     });
 
     const conversationHistory = await dbService.getConversationHistory(user.id);
@@ -136,7 +137,7 @@ export async function processMessage(
       role: msg.role as MessageRole,
       type: msg.type as MessageType,
       content: msg.content,
-      mediaUrl: msg.mediaUrl,
+      mediaUrl: msg.mediaTwilioUrl,
     }));
 
     const aiResponse = await openaiService.getChatCompletion(

@@ -28,9 +28,10 @@ model Message {
   role             String
   type             String
   content          String
-  mediaUrl         String?
-  mediaHash        String?
   moderationReason String?
+  mediaTwilioUrl   String?
+  mediaSha256Hash  String?
+  mediaContentType String?
 
   @@map("messages")
 }
