@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { Langfuse, LangfuseTraceClient, observeOpenAI } from "langfuse";
+import { LangfuseTraceClient, observeOpenAI } from "langfuse";
 import { MessageType, MessageRole } from "../types.js";
 import { ChatCompletionMessageParam } from "openai/resources.mjs";
 import logger from "./logger.js";
@@ -97,7 +97,8 @@ async function formatMessagesForOpenAI(
     } else {
       formattedMessages.push({
         role: message.role === "user" ? "user" : "assistant",
-        content: message.content,
+        content:
+          (message.isForwarded ? "FORWARDED MESSAGE:\n" : "") + message.content,
       });
     }
   }
