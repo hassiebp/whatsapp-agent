@@ -33,7 +33,7 @@ app.post("/webhook/whatsapp", async (req, res) => {
   logger.info("Received webhook from Twilio");
 
   try {
-    processMessage(req.body)
+    await processMessage(req.body)
       .then((result) => {
         if (!result.success) {
           logger.warn("Message processing completed with error:", result.error);
