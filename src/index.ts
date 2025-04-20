@@ -1,4 +1,5 @@
 import express from "express";
+import axios from "axios";
 import { pinoHttp } from "pino-http";
 import { processMessage } from "./services/message-processor.js";
 import config from "./config/index.js";
@@ -24,6 +25,21 @@ app.use(express.urlencoded({ extended: true }));
 
 app.get("/health", (_, res) => {
   res.status(200).json({ status: "ok" });
+});
+
+app.get("/twilio-ping", async (_, res) => {
+  const start = Date.now();
+  try {
+    await axios.get("https://api.twilio.com", {
+      auth: {
+        username: config.twilio.accountSid,
+        password: config.twilio.authToken,
+      },
+    });
+    res.send(`Twilio ping success in ${Date.now() - start}ms`);
+  } catch (e: unknown) {
+    res.send(`Twilio ping failed after ${Date.now() - start}ms: ${e}`);
+  }
 });
 
 app.post("/webhook/whatsapp", async (req, res) => {
