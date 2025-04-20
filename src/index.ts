@@ -27,26 +27,9 @@ app.get("/health", (_, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-app.get("/twilio-ping", async (_, res) => {
-  const start = Date.now();
-  try {
-    await axios.get("https://api.twilio.com", {
-      auth: {
-        username: config.twilio.accountSid,
-        password: config.twilio.authToken,
-      },
-    });
-    res.send(`Twilio ping success in ${Date.now() - start}ms`);
-  } catch (e: unknown) {
-    res.send(`Twilio ping failed after ${Date.now() - start}ms: ${e}`);
-  }
-});
-
 app.post("/webhook/whatsapp", async (req, res) => {
   // Important: Send immediate 200 OK response to Twilio
   // This prevents webhook timeouts as processing continues asynchronously
-  res.status(200).send();
-
   logger.info("Received webhook from Twilio");
 
   try {
@@ -63,6 +46,8 @@ app.post("/webhook/whatsapp", async (req, res) => {
       });
   } catch (error) {
     logger.error("Error starting message processing:", error);
+  } finally {
+    res.status(200).send();
   }
 });
 
