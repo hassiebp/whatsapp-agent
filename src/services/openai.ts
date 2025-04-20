@@ -4,6 +4,7 @@ import { MessageType, MessageRole } from "../types.js";
 import { ChatCompletionMessageParam } from "openai/resources.mjs";
 import logger from "./logger.js";
 import config from "../config/index.js";
+import { langfuseClient } from "./langfuse.js";
 
 const openai = new OpenAI();
 
@@ -60,7 +61,7 @@ export async function transcribeAudio(audioBuffer: Buffer) {
 async function formatMessagesForOpenAI(
   messages: AppMessage[],
 ): Promise<ChatCompletionMessageParam[]> {
-  const { prompt: systemPrompt } = await new Langfuse().getPrompt(
+  const { prompt: systemPrompt } = await langfuseClient.getPrompt(
     "whatsapp-agent-system-prompt",
   );
 
@@ -113,7 +114,9 @@ export async function getChatCompletion(
     parent: langfuseTrace,
   });
 
+  const getPromptSpan = langfuseTrace.span({ name: "getPrompt" });
   const formattedMessages = await formatMessagesForOpenAI(messages);
+  getPromptSpan.end();
 
   try {
     const completion = await wrappedOpenAI.chat.completions.create({

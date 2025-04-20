@@ -156,7 +156,11 @@ export async function processMessage(
       trace,
     );
 
+    const checkHasNewerMessagesSpan = trace.span({
+      name: "checkHasNewerMessages",
+    });
     const hasNewer = await dbService.hasNewerMessages(user.id, userMessage.id);
+    checkHasNewerMessagesSpan.end();
 
     if (hasNewer) {
       return { success: false, error: "Newer message detected" };
