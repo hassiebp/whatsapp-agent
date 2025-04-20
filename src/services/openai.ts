@@ -5,6 +5,8 @@ import { ChatCompletionMessageParam } from "openai/resources.mjs";
 import logger from "./logger.js";
 import config from "../config/index.js";
 
+const openai = new OpenAI();
+
 export interface AppMessage {
   role: MessageRole;
   type: MessageType;
@@ -14,7 +16,6 @@ export interface AppMessage {
 
 export async function moderateContent(content: string) {
   try {
-    const openai = new OpenAI();
     const moderationResponse = await openai.moderations.create({
       input: content,
     });
@@ -42,8 +43,6 @@ export async function moderateContent(content: string) {
 }
 
 export async function transcribeAudio(audioBuffer: Buffer) {
-  const openai = new OpenAI();
-
   try {
     const transcription = await openai.audio.transcriptions.create({
       file: new File([audioBuffer], "audio.ogg", { type: "audio/ogg" }),
@@ -109,7 +108,7 @@ export async function getChatCompletion(
   messages: AppMessage[],
   langfuseTrace: LangfuseTraceClient,
 ) {
-  const openai = observeOpenAI(new OpenAI(), {
+  const wrappedOpenAI = observeOpenAI(openai, {
     clientInitParams: { environment: config.nodeEnv },
     parent: langfuseTrace,
   });
@@ -117,7 +116,7 @@ export async function getChatCompletion(
   const formattedMessages = await formatMessagesForOpenAI(messages);
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await wrappedOpenAI.chat.completions.create({
       model: "gpt-4o",
       messages: formattedMessages,
       max_tokens: 800,

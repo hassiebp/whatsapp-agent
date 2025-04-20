@@ -28,10 +28,12 @@ export async function processMessage(
   trace.update({ metadata: { messageType } });
 
   try {
+    const findOrCreateUserSpan = trace.span({ name: "findOrCreateUser" });
     const user = await dbService.findOrCreateUser({
       phone: messageData.from,
       name: messageData.profileName,
     });
+    findOrCreateUserSpan.end();
     trace.update({ userId: user.id });
 
     if (user.isBanned) {
@@ -64,6 +66,7 @@ export async function processMessage(
     let mediaSha256Hash: string | null = null;
 
     if (messageData.hasMedia && mediaTwilioUrl) {
+      const downloadMediaSpan = trace.span({ name: "downloadMedia" });
       const mediaBuffer = await twilioService.downloadMedia(mediaTwilioUrl);
       const langfuseMedia = new LangfuseMedia({
         contentBytes: mediaBuffer,
@@ -71,6 +74,7 @@ export async function processMessage(
       });
 
       mediaSha256Hash = langfuseMedia.contentSha256Hash ?? null;
+      downloadMediaSpan.end();
       trace.update({ metadata: { media: langfuseMedia } });
 
       if (messageType === "audio") {
@@ -94,6 +98,7 @@ export async function processMessage(
       output: moderation,
       metadata: { moderationFlagged: moderation.flagged },
     });
+
     trace.update({
       metadata: {
         moderationFlagged: moderation.flagged,
@@ -122,6 +127,7 @@ export async function processMessage(
       return { success: false, error: "Content moderation failed" };
     }
 
+    const createUserMessageSpan = trace.span({ name: "createUserMessage" });
     const userMessage = await dbService.createMessage({
       userId: user.id,
       role: MessageRole.USER,
@@ -130,8 +136,13 @@ export async function processMessage(
       mediaTwilioUrl,
       mediaSha256Hash,
     });
+    createUserMessageSpan.end();
 
+    const getConversationHistorySpan = trace.span({
+      name: "getConversationHistory",
+    });
     const conversationHistory = await dbService.getConversationHistory(user.id);
+    getConversationHistorySpan.end();
 
     const appMessages = conversationHistory.map((msg) => ({
       role: msg.role as MessageRole,
@@ -151,14 +162,20 @@ export async function processMessage(
       return { success: false, error: "Newer message detected" };
     }
 
+    const createAssistantMessageSpan = trace.span({
+      name: "createAssistantMessage",
+    });
     await dbService.createMessage({
       userId: user.id,
       role: MessageRole.ASSISTANT,
       type: MessageType.TEXT,
       content: aiResponse,
     });
+    createAssistantMessageSpan.end();
 
+    const sendWhatsAppMessageSpan = trace.span({ name: "sendWhatsAppMessage" });
     await twilioService.sendWhatsAppMessage(user.phone, aiResponse);
+    sendWhatsAppMessageSpan.end();
 
     trace.update({ output: aiResponse });
 
