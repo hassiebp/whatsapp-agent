@@ -95,6 +95,7 @@ export async function createMessage({
   role,
   type,
   content,
+  isForwarded,
   mediaTwilioUrl = null,
   mediaSha256Hash = null,
   moderationReason = null,
@@ -109,6 +110,7 @@ export async function createMessage({
   mediaContentType?: string | null;
   moderationFlagged?: boolean | null;
   moderationReason?: string | null;
+  isForwarded?: boolean;
 }) {
   try {
     const message = await prisma.message.create({
@@ -121,6 +123,7 @@ export async function createMessage({
         mediaSha256Hash,
         moderationReason,
         mediaContentType,
+        isForwarded,
       },
     });
 

@@ -116,9 +116,9 @@ export async function processMessage(
         mediaSha256Hash,
         mediaContentType: messageData.mediaContentType,
         moderationReason: moderation.categories?.join(", "),
+        isForwarded: messageData.isFordwarded,
       });
 
-      // Send rejection message to user
       await twilioService.sendWhatsAppMessage(
         user.phone,
         `I'm unable to respond to that message as it may contain inappropriate content. Please try a different question or message.`,
@@ -135,6 +135,7 @@ export async function processMessage(
       content,
       mediaTwilioUrl,
       mediaSha256Hash,
+      isForwarded: messageData.isFordwarded,
     });
     createUserMessageSpan.end();
 
@@ -149,11 +150,13 @@ export async function processMessage(
       type: msg.type as MessageType,
       content: msg.content,
       mediaUrl: msg.mediaTwilioUrl,
+      isForwarded: msg.isForwarded,
     }));
 
     const aiResponse = await openaiService.getChatCompletion(
       appMessages,
       trace,
+      user.name ?? "",
     );
 
     const checkHasNewerMessagesSpan = trace.span({

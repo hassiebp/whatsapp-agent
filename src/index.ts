@@ -1,5 +1,4 @@
 import express from "express";
-import axios from "axios";
 import { pinoHttp } from "pino-http";
 import { processMessage } from "./services/message-processor.js";
 import config from "./config/index.js";
@@ -28,8 +27,6 @@ app.get("/health", (_, res) => {
 });
 
 app.post("/webhook/whatsapp", async (req, res) => {
-  // Important: Send immediate 200 OK response to Twilio
-  // This prevents webhook timeouts as processing continues asynchronously
   logger.info("Received webhook from Twilio");
 
   try {

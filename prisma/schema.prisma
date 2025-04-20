@@ -29,6 +29,7 @@ model Message {
   role             String
   type             String
   content          String
+  isForwarded      Boolean  @default(false)
   moderationReason String?
   mediaTwilioUrl   String?
   mediaSha256Hash  String?

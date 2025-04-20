@@ -13,6 +13,7 @@ export interface AppMessage {
   type: MessageType;
   content: string;
   mediaUrl?: string | null;
+  isForwarded: boolean;
 }
 
 export async function moderateContent(content: string) {
@@ -60,11 +61,8 @@ export async function transcribeAudio(audioBuffer: Buffer) {
 
 async function formatMessagesForOpenAI(
   messages: AppMessage[],
+  systemPrompt: string,
 ): Promise<ChatCompletionMessageParam[]> {
-  const { prompt: systemPrompt } = await langfuseClient.getPrompt(
-    "whatsapp-agent-system-prompt",
-  );
-
   const formattedMessages: ChatCompletionMessageParam[] = [
     {
       role: "system",
@@ -90,7 +88,9 @@ async function formatMessagesForOpenAI(
           },
           {
             type: "text",
-            text: message.content,
+            text:
+              (message.isForwarded ? "FORWARDED MESSAGE:\n" : "") +
+              message.content,
           },
         ],
       });
@@ -108,17 +108,23 @@ async function formatMessagesForOpenAI(
 export async function getChatCompletion(
   messages: AppMessage[],
   langfuseTrace: LangfuseTraceClient,
+  userName: string,
 ) {
-  const wrappedOpenAI = observeOpenAI(openai, {
-    clientInitParams: { environment: config.nodeEnv },
-    parent: langfuseTrace,
-  });
-
   const getPromptSpan = langfuseTrace.span({ name: "getPrompt" });
-  const formattedMessages = await formatMessagesForOpenAI(messages);
+  const prompt = await langfuseClient.getPrompt("whatsapp-agent-system-prompt");
+  const formattedMessages = await formatMessagesForOpenAI(
+    messages,
+    prompt.compile({ userName }),
+  );
   getPromptSpan.end();
 
   try {
+    const wrappedOpenAI = observeOpenAI(openai, {
+      clientInitParams: { environment: config.nodeEnv },
+      parent: langfuseTrace,
+      langfusePrompt: prompt,
+    });
+
     const completion = await wrappedOpenAI.chat.completions.create({
       model: "gpt-4o",
       messages: formattedMessages,
