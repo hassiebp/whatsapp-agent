@@ -51,7 +51,7 @@ export function extractMessageData(body: any) {
     MediaUrl0: mediaUrl,
     SmsMessageSid: messageSid,
     ProfileName: profileName,
-    Forwarded: isFordwarded,
+    Forwarded: forwarded,
   } = body;
 
   const numMedia = parseInt(numMediaStr || "0", 10);
@@ -68,7 +68,7 @@ export function extractMessageData(body: any) {
     mediaTwilioUrl: mediaUrl || null,
     numMedia,
     profileName,
-    isFordwarded,
+    isFordwarded: forwarded === "true",
   };
 }
 
