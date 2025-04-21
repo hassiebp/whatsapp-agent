@@ -31,5 +31,8 @@ CREATE TABLE "messages" (
 -- CreateIndex
 CREATE UNIQUE INDEX "users_phone_key" ON "users"("phone");
 
+-- CreateIndex
+CREATE INDEX "messages_userId_idx" ON "messages"("userId");
+
 -- AddForeignKey
 ALTER TABLE "messages" ADD CONSTRAINT "messages_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

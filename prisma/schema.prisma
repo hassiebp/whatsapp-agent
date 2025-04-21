@@ -36,4 +36,5 @@ model Message {
   mediaContentType String?
 
   @@map("messages")
+  @@index([userId])
 }
