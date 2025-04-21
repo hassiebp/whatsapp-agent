@@ -3,7 +3,6 @@ import { LangfuseTraceClient, observeOpenAI } from "langfuse";
 import { MessageType, MessageRole } from "../types.js";
 import { ChatCompletionMessageParam } from "openai/resources.mjs";
 import logger from "./logger.js";
-import config from "../config/index.js";
 import { langfuseClient } from "./langfuse.js";
 
 const openai = new OpenAI();
@@ -111,17 +110,15 @@ export async function getChatCompletion(
   langfuseTrace: LangfuseTraceClient,
   userName: string,
 ) {
-  const getPromptSpan = langfuseTrace.span({ name: "getPrompt" });
   const prompt = await langfuseClient.getPrompt("whatsapp-agent-system-prompt");
+  const compiledSystemPrompt = prompt.compile({ userName });
   const formattedMessages = await formatMessagesForOpenAI(
     messages,
-    prompt.compile({ userName }),
+    compiledSystemPrompt,
   );
-  getPromptSpan.end();
 
   try {
     const wrappedOpenAI = observeOpenAI(openai, {
-      clientInitParams: { environment: config.nodeEnv },
       parent: langfuseTrace,
       langfusePrompt: prompt,
     });

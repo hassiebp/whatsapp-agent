@@ -16,24 +16,15 @@ export async function processMessage(
   webhookData: unknown,
 ): Promise<ProcessMessageResult> {
   const trace = langfuseClient.trace({ name: "handleWhatsAppMessage" });
-  const parseWebhookSpan = trace.span({
-    name: "parse-webhook",
-    input: webhookData,
-  });
-
   const messageData = twilioService.extractMessageData(webhookData);
   const messageType = twilioService.determineMessageType(messageData);
-
-  parseWebhookSpan.end({ output: messageData, metadata: { messageType } });
   trace.update({ metadata: { messageType } });
 
   try {
-    const findOrCreateUserSpan = trace.span({ name: "findOrCreateUser" });
     const user = await dbService.findOrCreateUser({
       phone: messageData.from,
       name: messageData.profileName,
     });
-    findOrCreateUserSpan.end();
     trace.update({ userId: user.id });
 
     if (user.isBanned) {
@@ -68,13 +59,13 @@ export async function processMessage(
     if (messageData.hasMedia && mediaTwilioUrl) {
       const downloadMediaSpan = trace.span({ name: "downloadMedia" });
       const mediaBuffer = await twilioService.downloadMedia(mediaTwilioUrl);
+      downloadMediaSpan.end();
+
       const langfuseMedia = new LangfuseMedia({
         contentBytes: mediaBuffer,
         contentType: messageData.mediaContentType,
       });
-
       mediaSha256Hash = langfuseMedia.contentSha256Hash ?? null;
-      downloadMediaSpan.end();
       trace.update({ metadata: { media: langfuseMedia } });
 
       if (messageType === "audio") {
@@ -127,7 +118,6 @@ export async function processMessage(
       return { success: false, error: "Content moderation failed" };
     }
 
-    const createUserMessageSpan = trace.span({ name: "createUserMessage" });
     const userMessage = await dbService.createMessage({
       userId: user.id,
       role: MessageRole.USER,
@@ -137,14 +127,8 @@ export async function processMessage(
       mediaSha256Hash,
       isForwarded: messageData.isFordwarded,
     });
-    createUserMessageSpan.end();
 
-    const getConversationHistorySpan = trace.span({
-      name: "getConversationHistory",
-    });
     const conversationHistory = await dbService.getConversationHistory(user.id);
-    getConversationHistorySpan.end();
-
     const appMessages = conversationHistory.map((msg) => ({
       role: msg.role as MessageRole,
       type: msg.type as MessageType,
@@ -159,30 +143,24 @@ export async function processMessage(
       user.name ?? "",
     );
 
-    const checkHasNewerMessagesSpan = trace.span({
-      name: "checkHasNewerMessages",
-    });
-    const hasNewer = await dbService.hasNewerMessages(user.id, userMessage.id);
-    checkHasNewerMessagesSpan.end();
-
-    if (hasNewer) {
-      return { success: false, error: "Newer message detected" };
+    const hasNewerMessages = await dbService.hasNewerMessages(
+      user.id,
+      userMessage.id,
+    );
+    if (hasNewerMessages) {
+      return {
+        success: false,
+        error: "Newer messages found. Skipping response.",
+      };
     }
 
-    const createAssistantMessageSpan = trace.span({
-      name: "createAssistantMessage",
-    });
     await dbService.createMessage({
       userId: user.id,
       role: MessageRole.ASSISTANT,
       type: MessageType.TEXT,
       content: aiResponse,
     });
-    createAssistantMessageSpan.end();
-
-    const sendWhatsAppMessageSpan = trace.span({ name: "sendWhatsAppMessage" });
     await twilioService.sendWhatsAppMessage(user.phone, aiResponse);
-    sendWhatsAppMessageSpan.end();
 
     trace.update({ output: aiResponse });
 
