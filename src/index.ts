@@ -4,6 +4,7 @@ import { processMessage } from "./services/message-processor.js";
 import config from "./config/index.js";
 import logger from "./services/logger.js";
 
+const PORT = config.port;
 const app = express();
 
 const httpLogger = pinoHttp({
@@ -27,30 +28,22 @@ app.get("/health", (_, res) => {
 });
 
 app.post("/webhook/whatsapp", async (req, res) => {
-  logger.info("Received webhook from Twilio");
-
   try {
-    await processMessage(req.body)
-      .then((result) => {
-        if (!result.success) {
-          logger.warn("Message processing completed with error:", result.error);
-        } else {
-          logger.info("Message processing completed successfully");
-        }
-      })
-      .catch((error) => {
-        logger.error("Unhandled error in message processing:", error);
-      });
+    logger.info("Received webhook from Twilio");
+    const result = await processMessage(req.body);
+
+    if (!result.success) {
+      logger.warn(result.error, "Message processing failed");
+    } else {
+      logger.info("Message processed successfully");
+    }
   } catch (error) {
-    logger.error("Error starting message processing:", error);
+    logger.error(error, "Unhandled message processing error");
   } finally {
     res.status(200).send();
   }
 });
 
-const PORT = config.port;
-
 app.listen(PORT, () => {
-  logger.info(`✅ Server running on port ${PORT}`);
-  logger.info(`Environment: ${config.nodeEnv}`);
+  logger.info({ port: PORT, environment: config.nodeEnv }, "✅ Server started");
 });
